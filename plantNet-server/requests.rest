@@ -1,0 +1,5 @@
+POST http://localhost:9000/users/zubayersami38@gmail.com
+
+###
+
+GET  http://localhost:9000/plants
