@@ -14,7 +14,7 @@ const PlantDetails = () => {
   const { id } = useParams();
 
   const {
-    data: plant = [],
+    data: plant = {},
     isLoading,
     refetch,
   } = useQuery({
@@ -113,6 +113,7 @@ const PlantDetails = () => {
 
           <PurchaseModal
             plant={plant}
+            refetch={refetch}
             closeModal={closeModal}
             isOpen={isOpen}
           />

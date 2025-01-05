@@ -6,13 +6,69 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import Button from "../Shared/Button/Button";
 import useAuth from "../../hooks/useAuth";
+import toast from "react-hot-toast";
+import useAxiosSecure from "../../hooks/useAxiosSecure";
 
-const PurchaseModal = ({ closeModal, isOpen, plant }) => {
-  const { category, name, price, quantity } = plant;
+const PurchaseModal = ({ closeModal, isOpen, plant, refetch }) => {
   const { user } = useAuth();
+
+  const axiosSecure = useAxiosSecure();
+
+  const { category, name, seller, price, quantity, _id } = plant;
+  const [totalPrice, setTotalPrice] = useState(price);
+  const [totalQuantity, setTotalQuantity] = useState(1);
+  const [purchaseInfo, setPurchaseInfo] = useState({
+    customer: {
+      name: user?.displayName,
+      email: user?.email,
+      image: user?.photoURL,
+    },
+    plantId: _id,
+    price: totalPrice,
+    quantity: totalQuantity,
+    seller: seller?.email,
+    address: "",
+    status: "Pending",
+  });
+
+  // console.log(totalQuantity);
+
+  const handleQuantity = (value) => {
+    if (value > quantity) {
+      // setTotalQuantity(quantity);
+      return toast.error("Quantity exceeded available stock");
+    }
+    if (value < 0) {
+      return toast.error("Quantity cannot be less than or equal to 0");
+    }
+
+    setTotalQuantity(value);
+    setTotalPrice(value * price);
+    setPurchaseInfo((prev) => {
+      return { ...prev, price: value * price, quantity: value };
+    });
+  };
+
+  const handlePurchase = async () => {
+    console.table(purchaseInfo);
+    //post request to db
+    try {
+      await axiosSecure.post("/order", purchaseInfo);
+      // update quantity
+      await axiosSecure.patch(`/plant/quantity/${_id}`, {
+        quantityToUpdate: totalQuantity,
+      });
+      refetch();
+      toast.success("Order Successful!");
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      closeModal();
+    }
+  };
   // Total Price Calculation
 
   return (
@@ -61,7 +117,7 @@ const PurchaseModal = ({ closeModal, isOpen, plant }) => {
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500">Price: $ {price}</p>
+                  <p className="text-sm text-gray-500">Price: $ {totalPrice}</p>
                 </div>
                 <div className="mt-2">
                   <p className="text-sm text-gray-500">
@@ -76,6 +132,8 @@ const PurchaseModal = ({ closeModal, isOpen, plant }) => {
                   <input
                     className="px-2 py-1 text-gray-800 border border-lime-300 focus:outline-lime-500 rounded-md bg-white"
                     name="quantity"
+                    value={totalQuantity}
+                    onChange={(e) => handleQuantity(parseInt(e.target.value))}
                     step={1}
                     max={quantity}
                     id="quantity"
@@ -91,15 +149,24 @@ const PurchaseModal = ({ closeModal, isOpen, plant }) => {
                     Address:
                   </label>
                   <input
+                    onChange={(e) =>
+                      setPurchaseInfo((prev) => {
+                        return { ...prev, address: e.target?.value };
+                      })
+                    }
                     className="px-2 py-1 text-gray-800 border border-lime-300 focus:outline-lime-500 rounded-md bg-white"
                     name="address"
                     id="address"
                     type="text"
-                    placeholder="address"
+                    placeholder="Shipping Address"
                     required
                   />
                 </div>
-                <Button label="Confirm Purchase"></Button>
+                <Button
+                  onClick={() => handlePurchase(_id)}
+                  disabled={totalQuantity <= 0}
+                  label={`Pay ${totalPrice} $`}
+                ></Button>
               </DialogPanel>
             </TransitionChild>
           </div>
