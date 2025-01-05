@@ -51,6 +51,7 @@ async function run() {
     const db = client.db("plantNet");
     const usersCollection = db.collection("users");
     const plantsCollection = db.collection("plants");
+    const ordersCollection = db.collection("orders");
 
     // save a user
     app.post("/users/:email", async (req, res) => {
@@ -102,7 +103,7 @@ async function run() {
 
     // PLANTS
     // save a plant data in db
-    app.post("/add-plant", async (req, res) => {
+    app.post("/add-plant", verifyToken, async (req, res) => {
       const plant = req.body;
       const result = await plantsCollection.insertOne(plant);
       res.send(result);
@@ -117,6 +118,73 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await plantsCollection.findOne(query);
+      res.send(result);
+    });
+
+    // save purchase info
+    app.post("/order", verifyToken, async (req, res) => {
+      const orderInfo = req.body;
+      const result = await ordersCollection.insertOne(orderInfo);
+      res.send(result);
+    });
+
+    // manage plants quantity
+    app.patch("/plant/quantity/:id", async (req, res) => {
+      const id = req.params.id;
+      const { quantityToUpdate } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $inc: { quantity: -quantityToUpdate },
+      };
+      const result = await plantsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // get orders
+    app.get("/orders/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "customer.email": email };
+      const result = await ordersCollection
+        .aggregate([
+          //  find speicific order by user email
+          {
+            $match: query,
+          },
+          // convert plantId string to objectId
+          {
+            $addFields: {
+              plantId: { $toObjectId: "$plantId" },
+            },
+          },
+          // got to plants collection looking for the data with that plantId
+          {
+            $lookup: {
+              from: "plants", // collection name of the collection where we will look for the data(plantsCollection)
+              localField: "plantId", // local field (plantId from ordersCollection)
+              foreignField: "_id", // foreign field(_id from plantsCollection)
+              as: "plants", // return the matched data as array(will be an array)
+            },
+          },
+          // if only the returned (matched) value is in array and we need only one data, we can convert it to object.(should)
+          {
+            $unwind: "$plants",
+          },
+          // we dont need all the info, add only needed info to orders object
+          {
+            $addFields: {
+              name: "$plants.name",
+              image: "$plants.image",
+              category: "$plants.category",
+            },
+          },
+          // remove plants object from order object as we took the needed info
+          {
+            $project: {
+              plants: 0,
+            },
+          },
+        ])
+        .toArray();
       res.send(result);
     });
 
