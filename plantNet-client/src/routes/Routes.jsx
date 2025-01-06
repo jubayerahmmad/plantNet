@@ -1,40 +1,42 @@
-import { createBrowserRouter } from 'react-router-dom'
-import Home from '../pages/Home/Home'
-import ErrorPage from '../pages/ErrorPage'
-import Login from '../pages/Login/Login'
-import SignUp from '../pages/SignUp/SignUp'
-import PlantDetails from '../pages/PlantDetails/PlantDetails'
-import PrivateRoute from './PrivateRoute'
-import DashboardLayout from '../layouts/DashboardLayout'
-import AddPlant from '../pages/Dashboard/Seller/AddPlant'
-import ManageUsers from '../pages/Dashboard/Admin/ManageUsers'
-import Profile from '../pages/Dashboard/Common/Profile'
-import Statistics from '../pages/Dashboard/Common/Statistics'
-import MainLayout from '../layouts/MainLayout'
-import MyInventory from '../pages/Dashboard/Seller/MyInventory'
-import ManageOrders from '../pages/Dashboard/Seller/ManageOrders'
-import MyOrders from '../pages/Dashboard/Customer/MyOrders'
+import { createBrowserRouter } from "react-router-dom";
+import Home from "../pages/Home/Home";
+import ErrorPage from "../pages/ErrorPage";
+import Login from "../pages/Login/Login";
+import SignUp from "../pages/SignUp/SignUp";
+import PlantDetails from "../pages/PlantDetails/PlantDetails";
+import PrivateRoute from "./PrivateRoute";
+import DashboardLayout from "../layouts/DashboardLayout";
+import AddPlant from "../pages/Dashboard/Seller/AddPlant";
+import ManageUsers from "../pages/Dashboard/Admin/ManageUsers";
+import Profile from "../pages/Dashboard/Common/Profile";
+import Statistics from "../pages/Dashboard/Common/Statistics";
+import MainLayout from "../layouts/MainLayout";
+import MyInventory from "../pages/Dashboard/Seller/MyInventory";
+import ManageOrders from "../pages/Dashboard/Seller/ManageOrders";
+import MyOrders from "../pages/Dashboard/Customer/MyOrders";
+import SellerRoute from "./SellerRoute";
+import AdminRoute from "./AdminRoute";
 
 export const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <MainLayout />,
     errorElement: <ErrorPage />,
     children: [
       {
-        path: '/',
+        path: "/",
         element: <Home />,
       },
       {
-        path: '/plant/:id',
+        path: "/plant/:id",
         element: <PlantDetails />,
       },
     ],
   },
-  { path: '/login', element: <Login /> },
-  { path: '/signup', element: <SignUp /> },
+  { path: "/login", element: <Login /> },
+  { path: "/signup", element: <SignUp /> },
   {
-    path: '/dashboard',
+    path: "/dashboard",
     element: (
       <PrivateRoute>
         <DashboardLayout />
@@ -50,31 +52,37 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'add-plant',
+        path: "add-plant",
         element: (
           <PrivateRoute>
-            <AddPlant />
+            <SellerRoute>
+              <AddPlant />
+            </SellerRoute>
           </PrivateRoute>
         ),
       },
       {
-        path: 'my-inventory',
+        path: "my-inventory",
         element: (
           <PrivateRoute>
-            <MyInventory />
+            <SellerRoute>
+              <MyInventory />
+            </SellerRoute>
           </PrivateRoute>
         ),
       },
       {
-        path: 'manage-users',
+        path: "manage-users",
         element: (
           <PrivateRoute>
-            <ManageUsers />
+            <AdminRoute>
+              <ManageUsers />
+            </AdminRoute>
           </PrivateRoute>
         ),
       },
       {
-        path: 'profile',
+        path: "profile",
         element: (
           <PrivateRoute>
             <Profile />
@@ -82,7 +90,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'my-orders',
+        path: "my-orders",
         element: (
           <PrivateRoute>
             <MyOrders />
@@ -90,9 +98,15 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'manage-orders',
-        element: <ManageOrders />,
+        path: "manage-orders",
+        element: (
+          <PrivateRoute>
+            <SellerRoute>
+              <ManageOrders />,
+            </SellerRoute>
+          </PrivateRoute>
+        ),
       },
     ],
   },
-])
+]);
