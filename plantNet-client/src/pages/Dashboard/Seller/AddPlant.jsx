@@ -3,12 +3,13 @@ import AddPlantForm from "../../../components/Form/AddPlantForm";
 import imageUpload from "../../../api/utils";
 import useAuth from "../../../hooks/useAuth";
 import { useState } from "react";
-import { axiosSecure } from "../../../hooks/useAxiosSecure";
+import useAxiosSecure from "../../../hooks/useAxiosSecure";
 import toast from "react-hot-toast";
 
 const AddPlant = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const axiosSecure = useAxiosSecure();
   const [uploadBtnText, setUploadBtnText] = useState({
     image: { name: "Upload Image" },
   });
