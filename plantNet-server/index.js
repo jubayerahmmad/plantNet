@@ -47,12 +47,13 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
-    // collections
+    // -------------COLLECTIONS-------------
     const db = client.db("plantNet");
     const usersCollection = db.collection("users");
     const plantsCollection = db.collection("plants");
     const ordersCollection = db.collection("orders");
 
+    // -------------USER API-------------
     // save a user
     app.post("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -66,13 +67,41 @@ async function run() {
 
       const result = await usersCollection.insertOne({
         ...userData,
-        role: "customer",
+        role: "Customer",
         timestamp: Date.now(),
       });
       res.send(result);
     });
 
-    // Generate jwt token
+    // ----MANAGE USER STATUS & ROLE---
+    app.patch("/user/updateStatus/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      // find the user who requested
+      const user = await usersCollection.findOne(query);
+      if (!user || user?.status === "Requested") {
+        res
+          .status(400)
+          .send(
+            "You have already Requested. Please wait , Your status will be updated once requested Accepted"
+          );
+      }
+      const updatedDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+      const result = await usersCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+    //get user role
+    app.get("/user/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const result = await usersCollection.findOne({ email });
+      res.send({ role: result?.role });
+    });
+
+    // -------------Generate jwt token-------------
     app.post("/jwt", async (req, res) => {
       const email = req.body;
       const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
@@ -101,7 +130,7 @@ async function run() {
       }
     });
 
-    // PLANTS
+    // -------------PLANTS-------------
     // save a plant data in db
     app.post("/add-plant", verifyToken, async (req, res) => {
       const plant = req.body;
@@ -121,7 +150,8 @@ async function run() {
       res.send(result);
     });
 
-    // save purchase info
+    //  -------------ORDERS API-------------
+    // save order info
     app.post("/order", verifyToken, async (req, res) => {
       const orderInfo = req.body;
       const result = await ordersCollection.insertOne(orderInfo);
@@ -131,11 +161,17 @@ async function run() {
     // manage plants quantity
     app.patch("/plant/quantity/:id", async (req, res) => {
       const id = req.params.id;
-      const { quantityToUpdate } = req.body;
+      const { quantityToUpdate, status } = req.body;
       const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
+
+      let updatedDoc = {
         $inc: { quantity: -quantityToUpdate },
       };
+      if (status === "increase") {
+        updatedDoc = {
+          $inc: { quantity: quantityToUpdate },
+        };
+      }
       const result = await plantsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
@@ -146,45 +182,61 @@ async function run() {
       const query = { "customer.email": email };
       const result = await ordersCollection
         .aggregate([
-          //  find speicific order by user email
+          // Step 1: Find specific orders based on a query (e.g., user email)
           {
-            $match: query,
+            $match: query, // Filters the orders collection to only include documents that match the query.
           },
-          // convert plantId string to objectId
+          // Step 2: Convert the plantId field from a string to an ObjectId
           {
             $addFields: {
-              plantId: { $toObjectId: "$plantId" },
+              plantId: { $toObjectId: "$plantId" }, // Ensures plantId is compatible with the ObjectId format in the referenced plants collection.
             },
           },
-          // got to plants collection looking for the data with that plantId
+          // Step 3: Perform a lookup to join data from the plants collection
           {
             $lookup: {
-              from: "plants", // collection name of the collection where we will look for the data(plantsCollection)
-              localField: "plantId", // local field (plantId from ordersCollection)
-              foreignField: "_id", // foreign field(_id from plantsCollection)
-              as: "plants", // return the matched data as array(will be an array)
+              from: "plants", // Specifies the target collection to join with (plants).
+              localField: "plantId", // Matches the plantId in the orders collection.
+              foreignField: "_id", // Matches the _id in the plants collection.
+              as: "plants", // Outputs the matching plants data into a field called "plants" as an array.
             },
           },
-          // if only the returned (matched) value is in array and we need only one data, we can convert it to object.(should)
+          // Step 4: Unwind the plants array to simplify the structure
           {
-            $unwind: "$plants",
+            $unwind: "$plants", // Converts the array (plants) into individual objects, assuming only one match per plantId.
           },
-          // we dont need all the info, add only needed info to orders object
+          // Step 5: Add only the required fields from the plants collection to the order object
           {
             $addFields: {
-              name: "$plants.name",
-              image: "$plants.image",
-              category: "$plants.category",
+              name: "$plants.name", // Adds the name field from the plants collection.
+              image: "$plants.image", // Adds the image field from the plants collection.
+              category: "$plants.category", // Adds the category field from the plants collection.
             },
           },
-          // remove plants object from order object as we took the needed info
+          // Step 6: Remove the original plants field from the result
           {
             $project: {
-              plants: 0,
+              plants: 0, // Excludes the plants field from the final output.
             },
           },
         ])
-        .toArray();
+        .toArray(); // Converts the aggregation result to an array.
+
+      res.send(result);
+    });
+
+    // delete order by id
+    app.delete("/cancelOrder/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      // prevent cancel if the order is delivered
+      const order = await ordersCollection.findOne(query);
+      if (order.status === "Delivered") {
+        res.status(409).send("Order Cannot be cancelled once delivered");
+      }
+
+      const result = await ordersCollection.deleteOne(query);
       res.send(result);
     });
 
