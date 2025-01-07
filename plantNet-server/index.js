@@ -94,6 +94,15 @@ async function run() {
       const result = await usersCollection.updateOne(query, updatedDoc);
       res.send(result);
     });
+
+    // get all use data
+    app.get("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: { $ne: email } };
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+
     //get user role
     app.get("/user/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
