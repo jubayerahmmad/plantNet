@@ -24,8 +24,8 @@ const CustomerMenu = () => {
       console.log(data);
       toast.success("Successfully requested to become a seller");
     } catch (error) {
-      console.log(error.response.data.data);
-      toast.error(error.response.data.data);
+      console.log(error);
+      toast.error(error.response.data);
     } finally {
       closeModal();
     }
