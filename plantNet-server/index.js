@@ -53,6 +53,31 @@ async function run() {
     const plantsCollection = db.collection("plants");
     const ordersCollection = db.collection("orders");
 
+    // verifyAdmin middleware
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.user?.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user.role !== "Admin") {
+        res
+          .status(403)
+          .send({ message: "Forbidden Access. Admin Access Only" });
+      }
+      next();
+    };
+    // verifySeller middleware
+    const verifySeller = async (req, res, next) => {
+      const email = req.user?.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user.role !== "Seller") {
+        res
+          .status(403)
+          .send({ message: "Forbidden Access. Seller Access Only" });
+      }
+      next();
+    };
+
     // -------------USER API-------------
     // save a user
     app.post("/users/:email", async (req, res) => {
@@ -96,7 +121,7 @@ async function run() {
     });
 
     // get all use data
-    app.get("/users/:email", verifyToken, async (req, res) => {
+    app.get("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const query = { email: { $ne: email } };
       const result = await usersCollection.find(query).toArray();
@@ -109,6 +134,26 @@ async function run() {
       const result = await usersCollection.findOne({ email });
       res.send({ role: result?.role });
     });
+
+    // update a user role and status
+    app.patch(
+      "/user/role/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const { role } = req.body;
+        const filter = { email };
+        const updatedDoc = {
+          $set: {
+            role,
+            status: "Verified",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     // -------------Generate jwt token-------------
     app.post("/jwt", async (req, res) => {
@@ -141,7 +186,7 @@ async function run() {
 
     // -------------PLANTS-------------
     // save a plant data in db
-    app.post("/add-plant", verifyToken, async (req, res) => {
+    app.post("/add-plant", verifyToken, verifySeller, async (req, res) => {
       const plant = req.body;
       const result = await plantsCollection.insertOne(plant);
       res.send(result);
