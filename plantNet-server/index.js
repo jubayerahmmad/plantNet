@@ -204,6 +204,27 @@ async function run() {
       res.send(result);
     });
 
+    // get plants added by specific user
+    app.get("/plants/seller", verifyToken, verifySeller, async (req, res) => {
+      const email = req.user?.email; // from verify token --> seller
+      const query = { "seller.email": email };
+      const result = await plantsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // delete a plant by seller
+    app.delete(
+      "/delete-plant/:id",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await plantsCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
+
     //  -------------ORDERS API-------------
     // save order info
     app.post("/order", verifyToken, async (req, res) => {
@@ -230,7 +251,7 @@ async function run() {
       res.send(result);
     });
 
-    // get orders
+    // get orders for specific CUSTOMER(My Orders)
     app.get("/orders/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { "customer.email": email };
@@ -278,6 +299,58 @@ async function run() {
 
       res.send(result);
     });
+
+    // get orders for specific SELLER(Manage Orders)
+    app.get(
+      "/seller-orders/:email",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { seller: email };
+        const result = await ordersCollection
+          .aggregate([
+            // Step 1: Find specific orders based on a query (e.g., user email)
+            {
+              $match: query, // Filters the orders collection to only include documents that match the query.
+            },
+            // Step 2: Convert the plantId field from a string to an ObjectId
+            {
+              $addFields: {
+                plantId: { $toObjectId: "$plantId" }, // Ensures plantId is compatible with the ObjectId format in the referenced plants collection.
+              },
+            },
+            // Step 3: Perform a lookup to join data from the plants collection
+            {
+              $lookup: {
+                from: "plants", // Specifies the target collection to join with (plants).
+                localField: "plantId", // Matches the plantId in the orders collection.
+                foreignField: "_id", // Matches the _id in the plants collection.
+                as: "plants", // Outputs the matching plants data into a field called "plants" as an array.
+              },
+            },
+            // Step 4: Unwind the plants array to simplify the structure
+            {
+              $unwind: "$plants", // Converts the array (plants) into individual objects, assuming only one match per plantId.
+            },
+            // Step 5: Add only the required fields from the plants collection to the order object
+            {
+              $addFields: {
+                name: "$plants.name", // Adds the name field from the plants collection.
+              },
+            },
+            // Step 6: Remove the original plants field from the result
+            {
+              $project: {
+                plants: 0, // Excludes the plants field from the final output.
+              },
+            },
+          ])
+          .toArray(); // Converts the aggregation result to an array.
+
+        res.send(result);
+      }
+    );
 
     // delete order by id
     app.delete("/cancelOrder/:id", verifyToken, async (req, res) => {
