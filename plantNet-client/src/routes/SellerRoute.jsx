@@ -9,7 +9,7 @@ const SellerRoute = ({ children }) => {
     return children;
   }
   if (isLoading) return <LoadingSpinner />;
-  return <Navigate to="/dashboard" replace="true" />;
+  return <Navigate to="/dashboard/manage-orders" replace="true" />;
 };
 SellerRoute.propTypes = {
   children: PropTypes.node.isRequired,

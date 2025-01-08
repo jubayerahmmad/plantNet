@@ -21,8 +21,6 @@ const MyOrders = () => {
     },
   });
 
-  // console.log(orders);
-
   if (isLoading) return <LoadingSpinner></LoadingSpinner>;
 
   return (
