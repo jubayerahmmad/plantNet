@@ -54,7 +54,7 @@ const PurchaseModal = ({ closeModal, isOpen, plant, refetch }) => {
   };
 
   const handlePurchase = async () => {
-    console.table(purchaseInfo);
+    // console.table(purchaseInfo);
     //post request to db
     try {
       await axiosSecure.post("/order", purchaseInfo);

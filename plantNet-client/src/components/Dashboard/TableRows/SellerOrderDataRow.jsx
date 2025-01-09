@@ -1,11 +1,52 @@
 import PropTypes from "prop-types";
 import { useState } from "react";
 import DeleteModal from "../../Modal/DeleteModal";
-const SellerOrderDataRow = ({ order }) => {
+import useAxiosSecure from "../../../hooks/useAxiosSecure";
+import toast from "react-hot-toast";
+const SellerOrderDataRow = ({ order, refetch }) => {
   let [isOpen, setIsOpen] = useState(false);
   const closeModal = () => setIsOpen(false);
 
-  const { name, quantity, price, customer, status, address } = order;
+  const axiosSecure = useAxiosSecure();
+
+  const { name, quantity, price, customer, status, address, _id, plantId } =
+    order;
+
+  const handleDelete = async () => {
+    try {
+      // console.log(_id);
+      await axiosSecure.delete(`/cancelOrder/${_id}`);
+      toast.success("Order Cancelled");
+      // update(increase) quantity
+      await axiosSecure.patch(`/plant/quantity/${plantId}`, {
+        quantityToUpdate: quantity,
+        status: "increase",
+      });
+      refetch();
+    } catch (error) {
+      console.log(error);
+      toast.error(error.response.data);
+    } finally {
+      closeModal();
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    if (status === newStatus) return;
+    console.log(newStatus);
+    // patch req
+    try {
+      // update order status
+      await axiosSecure.patch(`/order/${_id}`, {
+        status: newStatus,
+      });
+      refetch();
+      toast.success("Status Updated");
+    } catch (error) {
+      console.log(error);
+      toast.error(error.response.data);
+    }
+  };
 
   return (
     <tr>
@@ -33,6 +74,8 @@ const SellerOrderDataRow = ({ order }) => {
           <select
             required
             defaultValue={status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            disabled={status === "Delivered"}
             className="p-1 border-2 border-lime-300 focus:outline-lime-500 rounded-md text-gray-900 whitespace-no-wrap bg-white"
             name="category"
           >
@@ -51,7 +94,11 @@ const SellerOrderDataRow = ({ order }) => {
             <span className="relative">Cancel</span>
           </button>
         </div>
-        <DeleteModal isOpen={isOpen} closeModal={closeModal} />
+        <DeleteModal
+          handleDelete={handleDelete}
+          isOpen={isOpen}
+          closeModal={closeModal}
+        />
       </td>
     </tr>
   );
