@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const nodemailer = require("nodemailer");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const morgan = require("morgan");
@@ -35,6 +36,45 @@ const verifyToken = async (req, res, next) => {
     next();
   });
 };
+
+// send email using Nodemailer
+const sendEmail = (emailAddress, emailData) => {
+  // create transporter
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.NODEMAILER_USER,
+      pass: process.env.NODEMAILER_PASS,
+    },
+  });
+  // verify connection
+  transporter.verify((error, success) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Transporter is ready", success);
+    }
+  });
+
+  const mailBody = {
+    from: process.env.NODEMAILER_USER,
+    to: emailAddress,
+    subject: emailData?.subject,
+    text: emailData?.message,
+    html: `<p> ${emailData.message}</p>`,
+  };
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log("error", error);
+    } else {
+      console.log("info", info);
+    }
+  });
+};
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.y41ia.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -81,6 +121,7 @@ async function run() {
     // -------------USER API-------------
     // save a user
     app.post("/users/:email", async (req, res) => {
+      // sendEmail();
       const email = req.params.email;
       const userData = req.body;
 
@@ -230,6 +271,19 @@ async function run() {
     app.post("/order", verifyToken, async (req, res) => {
       const orderInfo = req.body;
       const result = await ordersCollection.insertOne(orderInfo);
+      // send email
+      if (result?.insertedId) {
+        // to customer
+        sendEmail(orderInfo?.customer?.email, {
+          subject: "Order Successful",
+          message: `You've successfully placed an order, your transaction id: ${result?.insertedId}`,
+        });
+        // to seller
+        sendEmail(orderInfo?.seller, {
+          subject: "You've an order to process",
+          message: `You've got an order from ${orderInfo?.customer?.name},transaction id: ${result?.insertedId}`,
+        });
+      }
       res.send(result);
     });
 
@@ -310,47 +364,58 @@ async function run() {
         const query = { seller: email };
         const result = await ordersCollection
           .aggregate([
-            // Step 1: Find specific orders based on a query (e.g., user email)
             {
-              $match: query, // Filters the orders collection to only include documents that match the query.
+              $match: query,
             },
-            // Step 2: Convert the plantId field from a string to an ObjectId
+
             {
               $addFields: {
-                plantId: { $toObjectId: "$plantId" }, // Ensures plantId is compatible with the ObjectId format in the referenced plants collection.
+                plantId: { $toObjectId: "$plantId" },
               },
             },
-            // Step 3: Perform a lookup to join data from the plants collection
+
             {
               $lookup: {
-                from: "plants", // Specifies the target collection to join with (plants).
-                localField: "plantId", // Matches the plantId in the orders collection.
-                foreignField: "_id", // Matches the _id in the plants collection.
-                as: "plants", // Outputs the matching plants data into a field called "plants" as an array.
+                from: "plants",
+                localField: "plantId",
+                foreignField: "_id",
+                as: "plants",
               },
             },
-            // Step 4: Unwind the plants array to simplify the structure
+
             {
-              $unwind: "$plants", // Converts the array (plants) into individual objects, assuming only one match per plantId.
+              $unwind: "$plants",
             },
-            // Step 5: Add only the required fields from the plants collection to the order object
+
             {
               $addFields: {
-                name: "$plants.name", // Adds the name field from the plants collection.
+                name: "$plants.name",
               },
             },
-            // Step 6: Remove the original plants field from the result
+
             {
               $project: {
-                plants: 0, // Excludes the plants field from the final output.
+                plants: 0,
               },
             },
           ])
-          .toArray(); // Converts the aggregation result to an array.
+          .toArray();
 
         res.send(result);
       }
     );
+
+    // update order status
+    app.patch("/order/:id", verifyToken, verifySeller, async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: { status },
+      };
+      const result = await ordersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
     // delete order by id
     app.delete("/cancelOrder/:id", verifyToken, async (req, res) => {
