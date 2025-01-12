@@ -161,7 +161,7 @@ async function run() {
       res.send(result);
     });
 
-    // get all use data
+    // get all user data
     app.get("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const query = { email: { $ne: email } };
@@ -432,8 +432,35 @@ async function run() {
       res.send(result);
     });
 
+    // get ADMIN STATS
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
+      const totalUser = await usersCollection.estimatedDocumentCount();
+      const totalPlants = await plantsCollection.estimatedDocumentCount();
+
+      const orderDetails = await ordersCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$price" },
+              totalOrder: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+            },
+          },
+        ])
+        .next();
+
+      res.send({ totalUser, totalPlants, ...orderDetails });
+    });
+
+    // create payment - intent
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
