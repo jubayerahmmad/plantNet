@@ -7,16 +7,16 @@ import {
   DialogTitle,
 } from "@headlessui/react";
 import { Fragment, useState } from "react";
-import Button from "../Shared/Button/Button";
 import useAuth from "../../hooks/useAuth";
 import toast from "react-hot-toast";
-import useAxiosSecure from "../../hooks/useAxiosSecure";
-import { useNavigate } from "react-router-dom";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import CheckoutForm from "../Form/CheckoutForm";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const PurchaseModal = ({ closeModal, isOpen, plant, refetch }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const axiosSecure = useAxiosSecure();
 
   const { category, name, seller, price, quantity, _id } = plant;
   const [totalPrice, setTotalPrice] = useState(price);
@@ -52,27 +52,6 @@ const PurchaseModal = ({ closeModal, isOpen, plant, refetch }) => {
       return { ...prev, price: value * price, quantity: value };
     });
   };
-
-  const handlePurchase = async () => {
-    // console.table(purchaseInfo);
-    //post request to db
-    try {
-      await axiosSecure.post("/order", purchaseInfo);
-      // update(decrease) quantity
-      await axiosSecure.patch(`/plant/quantity/${_id}`, {
-        quantityToUpdate: totalQuantity,
-        status: "decrease",
-      });
-      refetch();
-      toast.success("Order Successful!");
-      navigate("/dashboard/my-orders");
-    } catch (error) {
-      console.log(error.message);
-    } finally {
-      closeModal();
-    }
-  };
-  // Total Price Calculation
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -165,11 +144,15 @@ const PurchaseModal = ({ closeModal, isOpen, plant, refetch }) => {
                     required
                   />
                 </div>
-                <Button
-                  onClick={() => handlePurchase(_id)}
-                  disabled={totalQuantity <= 0}
-                  label={`Pay ${totalPrice} $`}
-                ></Button>
+
+                {/*Checkout form  */}
+                <Elements stripe={stripePromise}>
+                  <CheckoutForm
+                    closeModal={closeModal}
+                    purchaseInfo={purchaseInfo}
+                    refetch={refetch}
+                  ></CheckoutForm>
+                </Elements>
               </DialogPanel>
             </TransitionChild>
           </div>
