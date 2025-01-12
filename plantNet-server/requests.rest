@@ -7,3 +7,6 @@ GET  http://localhost:9000/plants
 
 ###
 GET  http://localhost:9000/users
+
+###
+GET  http://localhost:9000/create-payment-intent

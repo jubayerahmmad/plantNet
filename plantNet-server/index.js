@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const nodemailer = require("nodemailer");
@@ -458,6 +459,25 @@ async function run() {
     });
 
     // create payment - intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const { quantity, plantId } = req.body;
+      const plant = await plantsCollection.findOne({
+        _id: new ObjectId(plantId),
+      });
+      if (!plant) {
+        return res.status(404).send({ message: "Plant not found" });
+      }
+      const totalPrice = quantity * plant.price * 100; // converted to cent
+
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: totalPrice,
+        currency: "usd",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+      res.send(client_secret);
+    });
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
