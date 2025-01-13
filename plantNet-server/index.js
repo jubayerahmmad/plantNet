@@ -438,6 +438,36 @@ async function run() {
       const totalUser = await usersCollection.estimatedDocumentCount();
       const totalPlants = await plantsCollection.estimatedDocumentCount();
 
+      /// generate chartData
+      const chartData = await ordersCollection
+        .aggregate([
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: "%Y-%m-%d",
+                  date: { $toDate: "$_id" },
+                },
+              },
+              quantity: { $sum: "$quantity" },
+              price: { $sum: "$price" },
+              order: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              date: "$_id",
+              quantity: 1,
+              price: 1,
+              order: 1,
+            },
+          },
+        ])
+        .toArray();
+      // console.log(chartData);
+
+      // get total revenue,order stats
       const orderDetails = await ordersCollection
         .aggregate([
           {
@@ -455,7 +485,7 @@ async function run() {
         ])
         .next();
 
-      res.send({ totalUser, totalPlants, ...orderDetails });
+      res.send({ totalUser, totalPlants, ...orderDetails, chartData });
     });
 
     // create payment - intent
